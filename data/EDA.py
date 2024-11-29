@@ -5,6 +5,7 @@ Exploratory Data Analysis
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 """
 Load datasets
@@ -41,11 +42,59 @@ supp_data_county = supp_data_county.pivot(index="CountySt", columns="Variable_Co
 obj1_df = obj1_df.join(supp_data_county, how="left")
 obj1_df.drop(supp_data_county.columns[1:], axis=1, inplace=True)
 
-## Merge response variables from other datasets
-hdm = heart_disease_mortality.loc[(heart_disease_mortality["Stratification1"]=="Overall") & (heart_disease_mortality["Stratification2"]=="Overall"), ["LocationAbbr", "LocationDesc", "Data_Value"]]
+## Merge heart disease mortality
+hdm = pd.read_csv('data/HeartDiseaseMortality/Heart_Disease_Mortality.csv')
+hdm = hdm.loc[(heart_disease_mortality["Stratification1"]=="Overall") & (hdm["Stratification2"]=="Overall"), ["LocationAbbr", "LocationDesc", "Data_Value"]]
 hdm.rename(columns={'LocationAbbr': 'State', 'LocationDesc': 'County', 'Data_Value': 'HDM'}, inplace=True)
 hdm['County'] = [c if 'County' not in c else c[:-7] for c in hdm['County']]
 hdm['CountySt'] = hdm['County'].str.cat(hdm['State'], sep=', ')
 hdm.drop(['State', 'County'], axis=1, inplace=True)
 hdm.set_index('CountySt', inplace=True)
 obj1_df = obj1_df.join(hdm, how='left')
+
+## Merge life expectancy
+life_expectancy = pd.read_csv('data/LifeExpectancy/U.S._Life_Expectancy.csv')
+life_expectancy.dropna(axis=0, how='any', inplace=True)
+life_expectancy['County'] = life_expectancy['County'].str.replace(' County', '')
+life_expectancy.rename(columns={'County': 'CountySt'}, inplace=True)
+life_expectancy = life_expectancy[['CountySt','Life Expectancy']].groupby(['CountySt']).mean()
+life_expectancy.set_index('CountySt', inplace=True)
+obj1_df = obj1_df.join(life_expectancy, how='left')
+
+## Remove duplicated indices
+obj1_df = obj1_df.groupby(level=0).max()
+
+## Compare response variables
+sns.pairplot(obj1_df, vars=['HDM', 'Life Expectancy', 'PCT_DIABETES_ADULTS13'], corner=True, diag_kind='kde', kind='kde')
+plt.show()
+
+sns.heatmap(obj1_df[['HDM', 'Life Expectancy', 'PCT_DIABETES_ADULTS13']].corr(), annot=True)
+plt.show()
+
+## Response variable PCA
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+
+# select response variables and standardize
+obj1_pca = obj1_df[['HDM', 'Life Expectancy', 'PCT_DIABETES_ADULTS13']].copy()
+obj1_pca.dropna(axis=0, how='any', inplace=True)
+obj1_pca = StandardScaler().fit_transform(obj1_pca)
+obj1_pca = pd.DataFrame(obj1_pca)
+obj1_pca.columns = ['HDM', 'Life Expectancy', 'PCT_DIABETES_ADULTS13']
+
+# PCA fit, transform, calculate explained variance
+response_pca = PCA(random_state=10).fit_transform(obj1_pca)
+explained_var = PCA(random_state=10).fit(obj1_pca).explained_variance_ratio_
+
+# compare first principle component with raw response variables
+obj1_pca['PCA'] = response_pca[:,0]
+
+sns.pairplot(obj1_pca, corner=True, diag_kind='kde', kind='kde')
+plt.show()
+
+sns.heatmap(obj1_pca.corr(), annot=True)
+plt.show()
+
+# count nans in response variables
+obj1_df[['HDM', 'Life Expectancy', 'PCT_DIABETES_ADULTS13']].isna().sum()
+print(f'% data retained after removing response variable nans: {obj1_pca.shape[0] / obj1_df.shape[0]*100:.2f}')
