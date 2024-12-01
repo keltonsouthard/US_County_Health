@@ -3,11 +3,36 @@ Objective 1: Model the relationship between health factors and socioeconomic fac
 
 Method: LASSO regression + CV
 """
+## Set directory
+import os
+import git
+
+def get_git_root(path):
+    """Find the root of a Git repository."""
+    try:
+        repo = git.Repo(path, search_parent_directories=True)
+        return repo.working_tree_dir
+    except git.InvalidGitRepositoryError:
+        return None
+
+# Get the root of the Git repository
+git_root = get_git_root(os.getcwd())
+
+if git_root:
+    # Change the working directory to the Git root
+    os.chdir(git_root)
+    print("Working directory changed to:", os.getcwd())
+else:
+    print("Not in a Git repository")
+
 ## Import packages
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
+from sklearn.linear_model import LassoCV, Lasso, LassoLarsIC
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 ## Read data
 df = pd.read_csv('./data/objective1.csv', index_col='CountySt')
@@ -50,6 +75,7 @@ def lasso_model(model, X_train, y_train, plot=False):
         plt.show()
 
     # print training results
+    print(f'________ \n{lasso} \n________')
     try:
         alpha = lasso.alpha_
     except:
@@ -62,9 +88,6 @@ def lasso_model(model, X_train, y_train, plot=False):
 
     return lasso_pipe, lasso
 
-## Import models
-from sklearn.linear_model import LassoCV, Lasso, LassoLarsIC
-
 ## Fit models
 lassocv_pipe, lassocv = lasso_model(LassoCV(random_state=10), X_train, y_train, plot=True) # (from https://scikit-learn.org/stable/auto_examples/linear_model/plot_lasso_model_selection.html#sphx-glr-auto-examples-linear-model-plot-lasso-model-selection-py)
 lasso_pipe, lasso = lasso_model(Lasso(alpha=0.1, random_state=10), X_train, y_train)
@@ -72,8 +95,6 @@ lassolarsaic_pipe, lassolarsaic = lasso_model(LassoLarsIC(criterion='aic'), X_tr
 lassolarsbic_pipe, lassolarsbic = lasso_model(LassoLarsIC(criterion='bic'), X_train, y_train)
 
 # alpha vs number of features
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
 alphas = np.logspace(-3, 0, 50)
 alpha_features = pd.DataFrame({'alpha':[], 'R2':[], 'features':[]})
 for alpha in alphas:
