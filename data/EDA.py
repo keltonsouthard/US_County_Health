@@ -75,29 +75,28 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
 # select response variables and standardize
-obj1_pca = obj1_df[['HDM', 'Life Expectancy', 'PCT_DIABETES_ADULTS13']].copy()
-obj1_pca.dropna(axis=0, how='any', inplace=True)
-obj1_pca = StandardScaler().fit_transform(obj1_pca)
-obj1_pca = pd.DataFrame(obj1_pca)
-obj1_pca.columns = ['HDM', 'Life Expectancy', 'PCT_DIABETES_ADULTS13']
+pca_df = obj1_df[['HDM', 'Life Expectancy', 'PCT_DIABETES_ADULTS13']].copy()
+pca_df.dropna(axis=0, how='any', inplace=True)
+pca_df[['HDM', 'Life Expectancy', 'PCT_DIABETES_ADULTS13']] = StandardScaler().fit_transform(pca_df)
 
 # PCA fit, transform, calculate explained variance
-response_pca = PCA(random_state=10).fit_transform(obj1_pca)
-explained_var = PCA(random_state=10).fit(obj1_pca).explained_variance_ratio_
+explained_var = PCA(random_state=10).fit(pca_df).explained_variance_ratio_
+pca_df['PCA'] = PCA(random_state=10, n_components=1).fit_transform(pca_df)
 
 # compare first principle component with raw response variables
-obj1_pca['PCA'] = response_pca[:,0]
-
-sns.pairplot(obj1_pca, corner=True, diag_kind='kde', kind='kde')
+sns.pairplot(pca_df, corner=True, diag_kind='kde', kind='kde')
 plt.show()
 
 plt.figure(figsize=(10,8))
-sns.heatmap(obj1_pca.corr(), annot=True)
+sns.heatmap(pca_df.corr(), annot=True)
 plt.show()
 
 # count nans in response variables
 obj1_df[['HDM', 'Life Expectancy', 'PCT_DIABETES_ADULTS13']].isna().sum()
-print(f'% data retained after removing response variable nans: {obj1_pca.shape[0] / obj1_df.shape[0]*100:.2f}')
+print(f'% data retained after removing response variable nans: {pca_df.shape[0] / obj1_df.shape[0]*100:.2f}')
+
+# merge PCA response variable
+obj1_df = obj1_df.join(pca_df['PCA'], how='left')
 
 ## Collinearity
 corr = obj1_df.corr().abs().unstack()
@@ -137,7 +136,10 @@ print(f'counties with nans have diabetes rates between {ttest.confidence_interva
 obj1_df.dropna(axis=0, inplace=True)
 
 ## Nonlinearity
-yvars = ['PCT_DIABETES_ADULTS13', 'HDM', 'Life Expectancy']
+yvars = ['PCT_DIABETES_ADULTS13', 'HDM', 'Life Expectancy', 'PCA']
 xvars = [v for v in obj1_df.columns if v not in yvars]
 sns.pairplot(obj1_df, x_vars=xvars, y_vars=yvars, diag_kind='kde')
 plt.show()
+
+## Write objective 1 dataset to csv
+obj1_df.to_csv('./data/objective1.csv', index_label='CountySt')
