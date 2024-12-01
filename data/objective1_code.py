@@ -8,7 +8,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
-from pandas.core.common import random_state
 
 ## Read data
 df = pd.read_csv('./data/objective1.csv', index_col='CountySt')
@@ -18,7 +17,7 @@ select_var = 'PCA'
 resp_vars = ['PCT_DIABETES_ADULTS13', 'Life Expectancy', 'HDM', 'PCA']
 df.drop([v for v in resp_vars if v != select_var], axis=1, inplace=True)
 
-## To numpy
+## X, y
 y = df[select_var]
 x_cols = [c for c in df.columns if c not in resp_vars]
 X = df[x_cols]
@@ -71,3 +70,21 @@ lassocv_pipe, lassocv = lasso_model(LassoCV(random_state=10), X_train, y_train, 
 lasso_pipe, lasso = lasso_model(Lasso(alpha=0.1, random_state=10), X_train, y_train)
 lassolarsaic_pipe, lassolarsaic = lasso_model(LassoLarsIC(criterion='aic'), X_train, y_train)
 lassolarsbic_pipe, lassolarsbic = lasso_model(LassoLarsIC(criterion='bic'), X_train, y_train)
+
+# alpha vs number of features
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+alphas = np.logspace(-3, 0, 50)
+alpha_features = pd.DataFrame({'alpha':[], 'R2':[], 'features':[]})
+for alpha in alphas:
+    lasso_pipe = make_pipeline(StandardScaler(), Lasso(alpha=alpha, random_state=10))
+    lasso_pipe.fit(X_train, y_train)
+    coefs = lasso_pipe[-1].coef_
+    tempdf = pd.DataFrame({'alpha': [alpha], 'R2': [lasso_pipe.score(X_train, y_train)], 'features': [np.count_nonzero(coefs)]})
+    alpha_features = pd.concat([alpha_features, tempdf], axis=0)
+
+# plot R2 vs features
+plt.plot(alpha_features['features'], alpha_features['R2'])
+plt.ylabel('Training R2')
+plt.xlabel('# features in model')
+plt.show()
