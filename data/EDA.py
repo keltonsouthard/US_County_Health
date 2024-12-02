@@ -6,6 +6,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+## Exclude life expectancy from output csv?
+exclude_life_exp = True
+
 """
 Load datasets
 """
@@ -147,16 +150,22 @@ import scipy.stats as stats
 ttest = stats.ttest_ind(nan_df.loc[nan_df['has_nans']==True, 'PCT_DIABETES_ADULTS13'], nan_df.loc[nan_df['has_nans']==False, 'PCT_DIABETES_ADULTS13'])
 print(f'counties with nans have diabetes rates between {ttest.confidence_interval()[0]:.4f} and {ttest.confidence_interval()[1]:.4f} greater than counties without nans, p-value = {ttest[1]:.4e}')
 
+# remove life expectancy before dropping nans?
+if exclude_life_exp:
+    obj1_df.drop('Life Expectancy', axis=1, inplace=True)
+
 # remove rows with nans
 obj1_df.dropna(axis=0, inplace=True)
 
-# ## Nonlinearity
-# yvars = ['PCT_DIABETES_ADULTS13', 'HDM', 'Life Expectancy', 'PCA']
-# xvars = [v for v in obj1_df.columns if v not in yvars]
-# sns.pairplot(obj1_df, x_vars=xvars, y_vars=yvars, diag_kind='kde')
-# plt.title('Response variables vs features pairplot (check for nonlinearity)')
-# plt.savefig('data/figures/nonlinearity check pairplot.png')
-# plt.show()
+## Nonlinearity
+yvars = ['PCT_DIABETES_ADULTS13', 'HDM', 'PCA']
+if not exclude_life_exp:
+    yvars += ['Life Expectancy']
+xvars = [v for v in obj1_df.columns if v not in yvars]
+sns.pairplot(obj1_df, x_vars=xvars, y_vars=yvars, diag_kind='kde')
+plt.title('Response variables vs features pairplot (check for nonlinearity)')
+plt.savefig('data/figures/nonlinearity check pairplot.png')
+plt.show()
 
 ## Check normality of all variables
 fig, axs = plt.subplots(6, 6, figsize=(15, 15))
@@ -182,7 +191,9 @@ res = shapiro(obj1_df, axis=0)
 normality_test = pd.DataFrame({'Features': obj1_df.columns, 'Statistic': res.statistic, 'pvalue': res.pvalue})
 
 # log transform
-log_0_vars = ['MEDHHINC15', 'PCT_18YOUNGER10', 'PCT_65OLDER10', 'POVRATE15', '2010_Census_Population', 'HDM', 'Life Expectancy', 'PCT_DIABETES_ADULTS13']
+log_0_vars = ['MEDHHINC15', 'PCT_18YOUNGER10', 'PCT_65OLDER10', 'POVRATE15', '2010_Census_Population', 'HDM', 'PCT_DIABETES_ADULTS13']
+if not exclude_life_exp:
+    log_0_vars += ['Life Expectancy']
 log_1_vars = ['ORCHARD_FARMS12', 'GROC11', 'SPECS11', 'FFR11', 'FSR11', 'RECFAC11', 'CONVS11', 'SUPERC11', 'FMRKT13', 'BERRY_FARMS12', 'GHVEG_FARMS12', 'VEG_FARMS12', 'SLHOUSE12', 'CSA12', 'AGRITRSM_OPS12', 'DIRSALES_FARMS12', 'SNAPSPTH12']
 log_01_vars = ['PCT_LACCESS_HHNV15', 'PCT_LACCESS_POP15', 'PCT_LACCESS_SNAP15']
 print(f'Check overlapping vars: {set(log_0_vars) & set(log_1_vars) & set(log_01_vars)}\nMissing vars: {set(obj1_df.columns) - set(log_0_vars) - set(log_1_vars) - set(log_01_vars)}')
@@ -206,5 +217,21 @@ res = shapiro(obj1_transformed, axis=0)
 normality_test['Log_statistic'] = res.statistic
 normality_test['Log_pvalue'] = res.pvalue
 
-# ## Write objective 1 dataset to csv
-# obj1_df.to_csv('./data/objective1.csv', index_label='CountySt')
+# create dummy vars
+obj1_dummy = obj1_transformed.copy()
+dummy_vars = ['SLHOUSE12', 'SUPERC11', 'GHVEG_FARMS12', 'SPECS11', 'RECFAC11', 'FMRKT13', 'CSA12', 'BERRY_FARMS12']
+for dv in dummy_vars:
+    obj1_dummy.loc[obj1_dummy[dv] > 0, dv] = 1.0
+
+# final distribution check
+fig, axs = plt.subplots(6, 5, figsize=(15, 15))
+axs = axs.flatten()
+for i,col in enumerate(obj1_dummy.columns):
+    sns.kdeplot(obj1_dummy[col], ax=axs[i])
+plt.tight_layout()
+plt.suptitle('Recheck distributions of all features after log-transform and dummy vars')
+plt.savefig('data/figures/final distribution check.png')
+plt.show()
+
+## Write objective 1 dataset to csv
+obj1_dummy.to_csv('./data/objective1.csv', index_label='CountySt')
