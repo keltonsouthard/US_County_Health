@@ -64,9 +64,13 @@ obj1_df = obj1_df.groupby(level=0).max()
 
 ## Compare response variables
 sns.pairplot(obj1_df, vars=['HDM', 'Life Expectancy', 'PCT_DIABETES_ADULTS13'], corner=True, diag_kind='kde', kind='kde')
+plt.title('Response variable pairplot kde')
+plt.savefig('data/figures/Response variable pairplot.png')
 plt.show()
 
 sns.heatmap(obj1_df[['HDM', 'Life Expectancy', 'PCT_DIABETES_ADULTS13']].corr(), annot=True)
+plt.title('Response variable correlations')
+plt.savefig('data/figures/Response variable corr heatmap.png')
 plt.show()
 
 ## Response variable PCA
@@ -87,11 +91,15 @@ pca_df['PCA'] = PCA(random_state=10, n_components=1).fit_transform(pca_df)
 
 # compare first principle component with raw response variables
 sns.pairplot(pca_df, corner=True, diag_kind='kde', kind='kde')
+plt.title('Response variable PCA pairplot kde')
+plt.savefig('data/figures/Response variable PCA pairplot.png')
 plt.show()
 
 # display correlations between response variables
 plt.figure(figsize=(10,8))
 sns.heatmap(pca_df.corr(), annot=True)
+plt.title('Response variable PCA correlations')
+plt.savefig('data/figures/Response variable PCA corr heatmap.png')
 plt.show()
 
 # count nans in response variables
@@ -130,6 +138,8 @@ nan_df['has_nans'] = nan_df['nans'] > 0
 
 # boxplot
 sns.boxplot(x=nan_df['PCT_DIABETES_ADULTS13'], hue=nan_df['has_nans'])
+plt.title('Difference in diabetes rates for counties with nans')
+plt.savefig('data/figures/diabetes rates vs nans boxplot.png')
 plt.show()
 
 # t test
@@ -144,6 +154,16 @@ obj1_df.dropna(axis=0, inplace=True)
 yvars = ['PCT_DIABETES_ADULTS13', 'HDM', 'Life Expectancy', 'PCA']
 xvars = [v for v in obj1_df.columns if v not in yvars]
 sns.pairplot(obj1_df, x_vars=xvars, y_vars=yvars, diag_kind='kde')
+plt.title('Response variables vs features pairplot (check for nonlinearity)')
+plt.savefig('data/figures/nonlinearity check pairplot.png')
+plt.show()
+
+## Check normality of all variables
+fig, axs = plt.subplots(6, 6, figsize=(15, 15))
+axs = axs.flatten()
+for i,col in enumerate(X.columns):
+    sns.histplot(X_train_sm[col], ax=axs[i])
+plt.tight_layout()
 plt.show()
 
 ## Write objective 1 dataset to csv
