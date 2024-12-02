@@ -248,4 +248,4 @@ fabric.properties
 #---------
 
 # ignore .csv files
-*.csv
+# *.csv
