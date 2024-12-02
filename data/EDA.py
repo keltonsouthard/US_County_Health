@@ -25,7 +25,7 @@ Load datasets
 Objective 1 feature selection
 """
 ## List of features to keep from state_county_data
-state_county_features = ["PCT_DIABETES_ADULTS13", "PCT_65OLDER10", "PCT_18YOUNGER10", "MEDHHINC15", "POVRATE15", "METRO13", "PCT_LACCESS_POP15", "PCT_LACCESS_LOWI15", "PCT_LACCESS_HHNV15", "PCT_LACCESS_SNAP15", "PCT_LACCESS_CHILD15", "PCT_LACCESS_SENIORS15", "GROCPTH11", "SUPERCPTH11", "CONVSPTH11", "SPECSPTH11", "SNAPSPTH12", "PC_SNAPBEN12", "FFRPTH11", "FSRPTH11", "SODATAX_STORES14", "SODATAX_VENDM14", "CHIPSTAX_STORES14", "CHIPSTAX_VENDM14", "FOOD_TAX14", "DIRSALES_FARMS12", "DIRSALES12", "PC_DIRSALES12", "FMRKT13", "FMRKTPTH13", "FMRKT_SNAP13", "PCT_FMRKT_FRVEG13", "PCT_FMRKT_ANMLPROD13", "VEG_FARMS12", "VEG_ACRES12", "ORCHARD_FARMS12", "ORCHARD_ACRES12", "BERRY_FARMS12", "BERRY_ACRES12", "SLHOUSE12", "GHVEG_FARMS12", "CSA12", "AGRITRSM_OPS12", "AGRITRSM_RCT12", "RECFACPTH11"]
+state_county_features = ["PCT_DIABETES_ADULTS13", "PCT_65OLDER10", "PCT_18YOUNGER10", "MEDHHINC15", "POVRATE15", "METRO13", "PCT_LACCESS_POP15", "PCT_LACCESS_LOWI15", "PCT_LACCESS_HHNV15", "PCT_LACCESS_SNAP15", "PCT_LACCESS_CHILD15", "PCT_LACCESS_SENIORS15", "GROC11", "SUPERC11", "CONVS11", "SPECS11", "SNAPSPTH12", "PC_SNAPBEN12", "FFR11", "FSR11", "SODATAX_STORES14", "SODATAX_VENDM14", "CHIPSTAX_STORES14", "CHIPSTAX_VENDM14", "FOOD_TAX14", "DIRSALES_FARMS12", "DIRSALES12", "PC_DIRSALES12", "FMRKT13", "FMRKT_SNAP13", "PCT_FMRKT_FRVEG13", "PCT_FMRKT_ANMLPROD13", "VEG_FARMS12", "VEG_ACRES12", "ORCHARD_FARMS12", "ORCHARD_ACRES12", "BERRY_FARMS12", "BERRY_ACRES12", "SLHOUSE12", "GHVEG_FARMS12", "CSA12", "AGRITRSM_OPS12", "AGRITRSM_RCT12", "RECFAC11"]
 
 ## Select features and tidy dataframe
 state_county_data = pd.read_csv('data/FoodEnvironmentAtlas/StateAndCountyData.csv')
@@ -150,21 +150,61 @@ print(f'counties with nans have diabetes rates between {ttest.confidence_interva
 # remove rows with nans
 obj1_df.dropna(axis=0, inplace=True)
 
-## Nonlinearity
-yvars = ['PCT_DIABETES_ADULTS13', 'HDM', 'Life Expectancy', 'PCA']
-xvars = [v for v in obj1_df.columns if v not in yvars]
-sns.pairplot(obj1_df, x_vars=xvars, y_vars=yvars, diag_kind='kde')
-plt.title('Response variables vs features pairplot (check for nonlinearity)')
-plt.savefig('data/figures/nonlinearity check pairplot.png')
-plt.show()
+# ## Nonlinearity
+# yvars = ['PCT_DIABETES_ADULTS13', 'HDM', 'Life Expectancy', 'PCA']
+# xvars = [v for v in obj1_df.columns if v not in yvars]
+# sns.pairplot(obj1_df, x_vars=xvars, y_vars=yvars, diag_kind='kde')
+# plt.title('Response variables vs features pairplot (check for nonlinearity)')
+# plt.savefig('data/figures/nonlinearity check pairplot.png')
+# plt.show()
 
 ## Check normality of all variables
 fig, axs = plt.subplots(6, 6, figsize=(15, 15))
 axs = axs.flatten()
-for i,col in enumerate(X.columns):
-    sns.histplot(X_train_sm[col], ax=axs[i])
+for i,col in enumerate(obj1_df.columns):
+    sns.kdeplot(obj1_df[col], ax=axs[i])
 plt.tight_layout()
+plt.suptitle('Check distributions of all features')
+plt.savefig('data/figures/feature normality check kde.png')
 plt.show()
 
-## Write objective 1 dataset to csv
-obj1_df.to_csv('./data/objective1.csv', index_label='CountySt')
+# count zeros for each feature
+print(f'count 0s per feature:\n{(obj1_df == 0).sum(axis=0)}')
+
+# remove bimodal features
+bimodal_vars = ['CHIPSTAX_VENDM14', 'FOOD_TAX14', 'SODATAX_STORES14', 'SODATAX_VENDM14']
+obj1_df.drop(bimodal_vars, axis=1, inplace=True)
+
+# test for normality
+from scipy.stats import shapiro
+import numpy as np
+res = shapiro(obj1_df, axis=0)
+normality_test = pd.DataFrame({'Features': obj1_df.columns, 'Statistic': res.statistic, 'pvalue': res.pvalue})
+
+# log transform
+log_0_vars = ['MEDHHINC15', 'PCT_18YOUNGER10', 'PCT_65OLDER10', 'POVRATE15', '2010_Census_Population', 'HDM', 'Life Expectancy', 'PCT_DIABETES_ADULTS13']
+log_1_vars = ['ORCHARD_FARMS12', 'GROC11', 'SPECS11', 'FFR11', 'FSR11', 'RECFAC11', 'CONVS11', 'SUPERC11', 'FMRKT13', 'BERRY_FARMS12', 'GHVEG_FARMS12', 'VEG_FARMS12', 'SLHOUSE12', 'CSA12', 'AGRITRSM_OPS12', 'DIRSALES_FARMS12', 'SNAPSPTH12']
+log_01_vars = ['PCT_LACCESS_HHNV15', 'PCT_LACCESS_POP15', 'PCT_LACCESS_SNAP15']
+print(f'Check overlapping vars: {set(log_0_vars) & set(log_1_vars) & set(log_01_vars)}\nMissing vars: {set(obj1_df.columns) - set(log_0_vars) - set(log_1_vars) - set(log_01_vars)}')
+
+obj1_transformed = obj1_df.copy()
+obj1_transformed[log_0_vars] = obj1_transformed[log_0_vars].transform(lambda x: np.log(x))
+obj1_transformed[log_1_vars] = obj1_transformed[log_1_vars].transform(lambda x: np.log(x+1))
+obj1_transformed[log_01_vars] = obj1_transformed[log_01_vars].transform(lambda x: np.log(x+0.01))
+
+# retest normality
+fig, axs = plt.subplots(6, 5, figsize=(15, 15))
+axs = axs.flatten()
+for i,col in enumerate(obj1_transformed.columns):
+    sns.kdeplot(obj1_transformed[col], ax=axs[i])
+plt.tight_layout()
+plt.suptitle('Recheck distributions of all features after log-transform')
+plt.savefig('data/figures/feature normality check kde log transformed.png')
+plt.show()
+
+res = shapiro(obj1_transformed, axis=0)
+normality_test['Log_statistic'] = res.statistic
+normality_test['Log_pvalue'] = res.pvalue
+
+# ## Write objective 1 dataset to csv
+# obj1_df.to_csv('./data/objective1.csv', index_label='CountySt')
