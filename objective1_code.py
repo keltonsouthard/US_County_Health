@@ -33,6 +33,7 @@ import pandas as pd
 from sklearn.linear_model import LassoCV, Lasso, LassoLarsIC
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
+import statsmodels.api as sm
 
 ## Read data
 df = pd.read_csv('./data/objective1.csv', index_col='CountySt')
@@ -105,7 +106,31 @@ for alpha in alphas:
     alpha_features = pd.concat([alpha_features, tempdf], axis=0)
 
 # plot R2 vs features
-plt.plot(alpha_features['features'], alpha_features['R2'])
+plt.scatter(alpha_features['features'], alpha_features['R2'])
 plt.ylabel('Training R2')
 plt.xlabel('# features in model')
 plt.show()
+
+## LASSO with statsmodels
+# select alpha value
+alpha = lassolarsbic.alpha_
+
+# standardize
+X_train_sm = X_train.copy()
+X_train_sm[X_train_sm.columns] = StandardScaler().fit_transform(X_train_sm)
+y_train_sm = pd.DataFrame(y_train).copy()
+y_train_sm[y_train_sm.columns] = StandardScaler().fit_transform(y_train_sm) * -1
+
+# add constants
+X_train_sm = sm.add_constant(X_train)
+
+# fit model
+lasso_sm = sm.OLS(y_train_sm, X_train_sm)
+lasso_sm_res = lasso_sm.fit_regularized(alpha=alpha)
+print(lasso_sm_res.params)
+
+## Linear regression with updated features - statsmodels
+keep_features = [v for v,z in zip(X.columns, lassolarsbic.coef_ != 0) if z]
+ols_sm = sm.OLS(y_train_sm, X_train_sm[keep_features])
+ols_sm_res = ols_sm.fit()
+ols_sm_res.summary()
