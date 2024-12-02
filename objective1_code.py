@@ -3,6 +3,9 @@ Objective 1: Model the relationship between health factors and socioeconomic fac
 
 Method: LASSO regression + CV
 """
+## Reverse response var sign?
+neg_resp_var = True
+
 ## Set directory
 import os
 import git
@@ -40,8 +43,9 @@ df = pd.read_csv('./data/objective1.csv', index_col='CountySt')
 
 ## Response variable selection
 select_var = 'PCA'
-resp_vars = ['PCT_DIABETES_ADULTS13', 'Life Expectancy', 'HDM', 'PCA']
+resp_vars = ['PCT_DIABETES_ADULTS13', 'HDM', 'PCA']
 df.drop([v for v in resp_vars if v != select_var], axis=1, inplace=True)
+df[select_var] *= -1 if neg_resp_var else 1
 
 ## X, y
 y = df[select_var]
@@ -53,7 +57,7 @@ from sklearn.model_selection import train_test_split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=10)
 
 """
-LASSO model
+LASSO model sklearn
 """
 def lasso_model(model, X_train, y_train, plot=False):
     from sklearn.pipeline import make_pipeline
@@ -73,6 +77,7 @@ def lasso_model(model, X_train, y_train, plot=False):
         plt.ylabel("Mean square error")
         plt.legend()
         plt.title(f"Mean square error on each fold: coordinate descent")
+        plt.savefig('data/figures/lassocv coordinate descent')
         plt.show()
 
     # print training results
@@ -109,28 +114,50 @@ for alpha in alphas:
 plt.scatter(alpha_features['features'], alpha_features['R2'])
 plt.ylabel('Training R2')
 plt.xlabel('# features in model')
+plt.savefig('data/figures/lasso r2 vs number of features.png')
 plt.show()
 
-## LASSO with statsmodels
+"""
+LASSO and OLS regression with statsmodels
+"""
+# pick favorite LASSO model
+fav_lasso = lassolarsbic
+
 # select alpha value
-alpha = lassolarsbic.alpha_
+alpha = fav_lasso.alpha_
 
 # standardize
 X_train_sm = X_train.copy()
 X_train_sm[X_train_sm.columns] = StandardScaler().fit_transform(X_train_sm)
 y_train_sm = pd.DataFrame(y_train).copy()
-y_train_sm[y_train_sm.columns] = StandardScaler().fit_transform(y_train_sm) * -1
+y_train_sm[y_train_sm.columns] = StandardScaler().fit_transform(y_train_sm)
 
 # add constants
 X_train_sm = sm.add_constant(X_train)
 
-# fit model
-lasso_sm = sm.OLS(y_train_sm, X_train_sm)
-lasso_sm_res = lasso_sm.fit_regularized(alpha=alpha)
-print(lasso_sm_res.params)
+# # fit model
+# lasso_sm = sm.OLS(y_train_sm, X_train_sm)
+# lasso_sm_res = lasso_sm.fit_regularized(alpha=alpha)
+# print(lasso_sm_res.params)
 
 ## Linear regression with updated features - statsmodels
-keep_features = [v for v,z in zip(X.columns, lassolarsbic.coef_ != 0) if z]
+keep_features = [v for v,z in zip(X.columns, fav_lasso.coef_ != 0) if z]
 ols_sm = sm.OLS(y_train_sm, X_train_sm[keep_features])
 ols_sm_res = ols_sm.fit()
 ols_sm_res.summary()
+
+# top coefficients
+print(f'Top positive coefs: \n{ols_sm_res.params.sort_values(ascending=False).head()}')
+print(f'Top negative coefs: \n{ols_sm_res.params.sort_values(ascending=True).head()}')
+
+# check normality in residuals
+y_pred_sm = ols_sm_res.predict(X_train_sm[keep_features])
+
+fig, axs = plt.subplots(1,2)
+sns.histplot(ols_sm_res.resid, ax=axs[0])
+sns.scatterplot(x=y_pred_sm, y=ols_sm_res.resid, ax=axs[1])
+axs[1].set_ylabel('Residuals')
+axs[1].set_xlabel('Predicted')
+axs[0].set_xlabel('Residuals')
+plt.savefig('data/figures/normality in residuals.png')
+plt.show()
