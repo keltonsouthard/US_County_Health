@@ -3,7 +3,6 @@ Exploratory Data Analysis
 """
 ## import packages
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -74,10 +73,13 @@ plt.show()
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
+# choose response vars to use
+resp_vars = ['HDM', 'PCT_DIABETES_ADULTS13']
+
 # select response variables and standardize
-pca_df = obj1_df[['HDM', 'Life Expectancy', 'PCT_DIABETES_ADULTS13']].copy()
+pca_df = obj1_df[resp_vars].copy()
 pca_df.dropna(axis=0, how='any', inplace=True)
-pca_df[['HDM', 'Life Expectancy', 'PCT_DIABETES_ADULTS13']] = StandardScaler().fit_transform(pca_df)
+pca_df[resp_vars] = StandardScaler().fit_transform(pca_df)
 
 # PCA fit, transform, calculate explained variance
 explained_var = PCA(random_state=10).fit(pca_df).explained_variance_ratio_
@@ -87,13 +89,14 @@ pca_df['PCA'] = PCA(random_state=10, n_components=1).fit_transform(pca_df)
 sns.pairplot(pca_df, corner=True, diag_kind='kde', kind='kde')
 plt.show()
 
+# display correlations between response variables
 plt.figure(figsize=(10,8))
 sns.heatmap(pca_df.corr(), annot=True)
 plt.show()
 
 # count nans in response variables
-obj1_df[['HDM', 'Life Expectancy', 'PCT_DIABETES_ADULTS13']].isna().sum()
-print(f'% data retained after removing response variable nans: {pca_df.shape[0] / obj1_df.shape[0]*100:.2f}')
+obj1_df[resp_vars].isna().sum()
+print(f'% data retained after removing response variable nans: {pca_df.shape[0] / obj1_df.shape[0]*100:.2f}%\n')
 
 # merge PCA response variable
 obj1_df = obj1_df.join(pca_df['PCA'], how='left')
@@ -101,6 +104,7 @@ obj1_df = obj1_df.join(pca_df['PCA'], how='left')
 ## Collinearity
 corr = obj1_df.corr().abs().unstack()
 corr = corr.sort_values(ascending=False)
+print('__________\nCollinear features\n__________')
 print('\n'.join([f'{c1}, {c2}: {corr[c1,c2]:.4f}' for c1, c2 in corr.index if c1 != c2 and corr[c1,c2] > 0.7]))
 
 # drop collinear variables
@@ -109,6 +113,7 @@ obj1_df.drop(['CHIPSTAX_STORES14', 'PCT_LACCESS_CHILD15', 'PCT_LACCESS_SENIORS15
 ## Nan analysis
 # count nans in all variables
 nan_count = obj1_df.isna().sum()
+print('__________\nFeatures with >5% nans\n__________\n')
 print(nan_count[nan_count > 0.05*obj1_df.shape[0]])
 
 # drop variables with >5% nans (except census population and life expectancy)
