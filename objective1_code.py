@@ -37,6 +37,7 @@ from sklearn.linear_model import LassoCV, Lasso, LassoLarsIC
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 import statsmodels.api as sm
+from sklearn.ensemble import RandomForestRegressor
 
 ## Read data
 df = pd.read_csv('./data/objective1.csv', index_col='CountySt')
@@ -59,10 +60,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_
 """
 LASSO model sklearn
 """
-def lasso_model(model, X_train, y_train, plot=False):
-    from sklearn.pipeline import make_pipeline
-    from sklearn.preprocessing import StandardScaler
-
+def lasso_model(model, X_train, y_train, plot=False, test_score=False, X_test=None, y_test=None):
     ## Fit model (from https://scikit-learn.org/stable/auto_examples/linear_model/plot_lasso_model_selection.html#sphx-glr-auto-examples-linear-model-plot-lasso-model-selection-py)
     lasso_pipe = make_pipeline(StandardScaler(), model)
     lasso_pipe.fit(X_train, y_train)
@@ -86,16 +84,19 @@ def lasso_model(model, X_train, y_train, plot=False):
         alpha = lasso.alpha_
     except:
         alpha = lasso.alpha
-    print(f'best alpha: {alpha}')
+    print(f'best alpha: {alpha:.4e}')
     coefs = pd.DataFrame({'feature': X_train.columns, 'coefficients': lasso.coef_})
-    print(f'top coefficients: \n{coefs.sort_values(ascending=False, by='coefficients').head()}')
+    print(f'top positive coefficients: \n{coefs.sort_values(ascending=False, by='coefficients').head()}')
+    print(f'top negative coefficients: \n{coefs.sort_values(ascending=True, by='coefficients').head()}')
     print(f'# zero coefs = {coefs[coefs['coefficients']==0].shape[0]}, # nonzero coefs = {coefs[coefs['coefficients']!=0].shape[0]} \n{coefs.loc[coefs['coefficients'] == 0, 'feature']}')
-    print(f'R2: {lasso_pipe.score(X_train, y_train):.4f}')
+    print(f'Training R2: {lasso_pipe.score(X_train, y_train):.4f}')
+    if test_score:
+        print(f'Test R2: {lasso_pipe.score(X_test, y_test):.4f}')
 
     return lasso_pipe, lasso
 
 ## Fit models
-lassocv_pipe, lassocv = lasso_model(LassoCV(random_state=10), X_train, y_train, plot=True) # (from https://scikit-learn.org/stable/auto_examples/linear_model/plot_lasso_model_selection.html#sphx-glr-auto-examples-linear-model-plot-lasso-model-selection-py)
+lassocv_pipe, lassocv = lasso_model(LassoCV(random_state=10), X_train, y_train, plot=True, test_score=True, X_test=X_test, y_test=y_test) # (from https://scikit-learn.org/stable/auto_examples/linear_model/plot_lasso_model_selection.html#sphx-glr-auto-examples-linear-model-plot-lasso-model-selection-py)
 lasso_pipe, lasso = lasso_model(Lasso(alpha=0.1, random_state=10), X_train, y_train)
 lassolarsaic_pipe, lassolarsaic = lasso_model(LassoLarsIC(criterion='aic'), X_train, y_train)
 lassolarsbic_pipe, lassolarsbic = lasso_model(LassoLarsIC(criterion='bic'), X_train, y_train)
@@ -116,6 +117,15 @@ plt.ylabel('Training R2')
 plt.xlabel('# features in model')
 plt.savefig('data/figures/lasso r2 vs number of features.png')
 plt.show()
+
+## RandomForest
+rfm = RandomForestRegressor(random_state=10, oob_score=True).fit(X_train, y_train)
+var_imp = pd.DataFrame({'features': X_train.columns, 'importance': rfm.feature_importances_})
+print(f'__________\nRandom Forest Regressor \n__________ \nOOB score: {rfm.oob_score_:.4f}')
+print(f'Top 10 most important features\n{var_imp.sort_values('importance', ascending=False)[:10]}')
+
+## LassoCV test score
+print(f'LassoCV test R2: {lassocv_pipe.score(X_test, y_test):.4f}')
 
 """
 LASSO and OLS regression with statsmodels
