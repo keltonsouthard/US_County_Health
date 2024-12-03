@@ -38,6 +38,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 import statsmodels.api as sm
 from sklearn.ensemble import RandomForestRegressor
+from scipy.stats import shapiro
 
 ## Read data
 df = pd.read_csv('./data/objective1.csv', index_col='CountySt')
@@ -67,7 +68,7 @@ def lasso_model(model, X_train, y_train, plot=False, test_score=False, X_test=No
     lasso = lasso_pipe[-1]
 
     if plot:
-        # plot
+        # plot CV results
         plt.semilogx(lasso.alphas_, lasso.mse_path_, linestyle=":")
         plt.plot(lasso.alphas_, lasso.mse_path_.mean(axis=-1), color="black", label="Average across the folds", linewidth=2)
         plt.axvline(lasso.alpha_, linestyle="--", color="black", label="alpha: CV estimate")
@@ -75,7 +76,21 @@ def lasso_model(model, X_train, y_train, plot=False, test_score=False, X_test=No
         plt.ylabel("Mean square error")
         plt.legend()
         plt.title(f"Mean square error on each fold: coordinate descent")
-        plt.savefig('data/figures/lassocv coordinate descent')
+        plt.savefig('data/figures/lassocv coordinate descent.png')
+        plt.show()
+
+        # plot residuals
+        pred = lasso_pipe.predict(X_test)
+        res = y_test - pred
+        norm = shapiro(res)
+        fig, axs = plt.subplots(1, 2, figsize=(10,6))
+        sns.histplot(res, ax=axs[0])
+        sns.scatterplot(x=pred, y=res, ax=axs[1], alpha=0.8)
+        axs[0].set_xlabel('Test Residuals')
+        axs[1].set_xlabel('Test Predictions')
+        axs[1].set_ylabel('Test Residuals')
+        fig.suptitle(f'{model} normality check (Shapiro-Wilk score: {norm[0]:.4f}, pvalue: {norm[1]:.2e})')
+        plt.savefig('data/figures/lassocv normality check.png')
         plt.show()
 
     # print training results
@@ -123,9 +138,6 @@ rfm = RandomForestRegressor(random_state=10, oob_score=True).fit(X_train, y_trai
 var_imp = pd.DataFrame({'features': X_train.columns, 'importance': rfm.feature_importances_})
 print(f'__________\nRandom Forest Regressor \n__________ \nOOB score: {rfm.oob_score_:.4f}')
 print(f'Top 10 most important features\n{var_imp.sort_values('importance', ascending=False)[:10]}')
-
-## LassoCV test score
-print(f'LassoCV test R2: {lassocv_pipe.score(X_test, y_test):.4f}')
 
 """
 LASSO and OLS regression with statsmodels
