@@ -233,5 +233,32 @@ plt.suptitle('Recheck distributions of all features after log-transform and dumm
 plt.savefig('data/figures/final distribution check.png')
 plt.show()
 
+"""
+Detrending data by income
+"""
+# model income vs health
+from sklearn.linear_model import LinearRegression
+X, y = obj1_dummy.loc[:,['MEDHHINC15']], obj1_dummy['PCA']
+reg = LinearRegression().fit(X=X, y=y)
+coef = reg.coef_
+pred = reg.predict(X=X)
+res = y - pred
+r2 = reg.score(X=X, y=y)
+
+# check normality
+fig, axs = plt.subplots(1, 2, figsize=(8, 5))
+sns.histplot(res, ax=axs[0])
+sns.regplot(x=pred, y=res, ax=axs[1], scatter_kws={'alpha':0.4}, line_kws=dict(color="r"))
+axs[0].set_xlabel('Residuals')
+axs[1].set_xlabel('Predictions')
+axs[1].set_ylabel('Residuals')
+fig.suptitle(f'Income trend normality check (coef = {coef[0]:.3f}, R2 = {r2:.3f})')
+plt.savefig('data/figures/income trend normality check.png')
+plt.show()
+
+# record detrended data
+obj1_dummy['PCA_detrended'] = res
+
 ## Write objective 1 dataset to csv
 obj1_dummy.to_csv('./data/objective1.csv', index_label='CountySt')
+# obj1_df.to_csv('./data/objective1_raw.csv', index_label='CountySt')
