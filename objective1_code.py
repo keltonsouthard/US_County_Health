@@ -3,9 +3,6 @@ Objective 1: Model the relationship between health factors and socioeconomic fac
 
 Method: LASSO regression + CV
 """
-## Reverse response var sign?
-neg_resp_var = True
-
 ## Set directory
 import os
 import git
@@ -39,23 +36,38 @@ from sklearn.preprocessing import StandardScaler
 import statsmodels.api as sm
 from sklearn.ensemble import RandomForestRegressor
 from scipy.stats import shapiro
+from sklearn.model_selection import train_test_split
 
 ## Read data
 df = pd.read_csv('./data/objective1.csv', index_col='CountySt')
 
+"""
+Optional variable selection
+"""
+## Reverse response var sign?
+neg_resp_var = True
+
 ## Response variable selection
-select_var = 'PCA'
-resp_vars = ['PCT_DIABETES_ADULTS13', 'HDM', 'PCA']
+select_var = 'PCA_detrended'
+resp_vars = ['PCT_DIABETES_ADULTS13', 'HDM', 'PCA', 'PCA_detrended']
 df.drop([v for v in resp_vars if v != select_var], axis=1, inplace=True)
 df[select_var] *= -1 if neg_resp_var else 1
 
+## Remove income vars?
+rem_income_vars = True
+income_vars = ['MEDHHINC15', 'PCT_LACCESS_HHNV15', 'POVRATE15', 'SNAPSPTH12']
+if rem_income_vars:
+    df.drop(income_vars, axis=1, inplace=True)
+
+"""
+Data partitioning
+"""
 ## X, y
 y = df[select_var]
 x_cols = [c for c in df.columns if c not in resp_vars]
 X = df[x_cols]
 
 ## Train test split
-from sklearn.model_selection import train_test_split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=10)
 
 """
@@ -76,7 +88,7 @@ def lasso_model(model, X_train, y_train, plot=False, test_score=False, X_test=No
         plt.ylabel("Mean square error")
         plt.legend()
         plt.title(f"Mean square error on each fold: coordinate descent")
-        plt.savefig('data/figures/lassocv coordinate descent.png')
+        # plt.savefig('data/figures/lassocv coordinate descent.png')
         plt.show()
 
         # plot residuals
@@ -90,7 +102,7 @@ def lasso_model(model, X_train, y_train, plot=False, test_score=False, X_test=No
         axs[1].set_xlabel('Test Predictions')
         axs[1].set_ylabel('Test Residuals')
         fig.suptitle(f'{model} normality check (Shapiro-Wilk score: {norm[0]:.4f}, pvalue: {norm[1]:.2e})')
-        plt.savefig('data/figures/lassocv normality check.png')
+        # plt.savefig('data/figures/lassocv normality check.png')
         plt.show()
 
     # print training results
@@ -130,7 +142,7 @@ for alpha in alphas:
 plt.scatter(alpha_features['features'], alpha_features['R2'])
 plt.ylabel('Training R2')
 plt.xlabel('# features in model')
-plt.savefig('data/figures/lasso r2 vs number of features.png')
+# plt.savefig('data/figures/lasso r2 vs number of features.png')
 plt.show()
 
 ## RandomForest
@@ -181,5 +193,5 @@ sns.scatterplot(x=y_pred_sm, y=ols_sm_res.resid, ax=axs[1])
 axs[1].set_ylabel('Residuals')
 axs[1].set_xlabel('Predicted')
 axs[0].set_xlabel('Residuals')
-plt.savefig('data/figures/normality in residuals.png')
+# plt.savefig('data/figures/normality in residuals.png')
 plt.show()
