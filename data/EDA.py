@@ -6,7 +6,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from imblearn.pipeline import make_pipeline
 
 ## Exclude life expectancy from output csv?
 exclude_life_exp = True
